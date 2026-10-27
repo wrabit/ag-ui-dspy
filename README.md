@@ -54,6 +54,29 @@ app = FastAPI()
 add_dspy_fastapi_endpoint(app, DSPyAgent(make_agent), path="/agent")
 ```
 
+`add_dspy_fastapi_endpoint` is a convenience, the same helper shape as `add_langgraph_fastapi_endpoint` and `add_adk_fastapi_endpoint` in the other Python integrations. The route it registers is this, so write it yourself when you need auth, middleware or another framework:
+
+```python
+from ag_ui.core import RunAgentInput
+from ag_ui.encoder import EventEncoder
+from fastapi import Request
+from fastapi.responses import StreamingResponse
+
+agent = DSPyAgent(make_agent)
+
+@app.post("/agent")
+async def agent_endpoint(run_input: RunAgentInput, request: Request):
+    encoder = EventEncoder(accept=request.headers.get("accept"))
+
+    async def events():
+        async for event in agent.run(run_input):   # AsyncIterator[ag_ui.core.BaseEvent]
+            yield encoder.encode(event)             # "data: {...}\n\n"
+
+    return StreamingResponse(events(), media_type=encoder.get_content_type())
+```
+
+`DSPyAgent.run(run_input)` is the whole contract: `RunAgentInput` in, an async iterator of `ag_ui.core` events out. Anything that can stream server-sent events can serve it.
+
 `DSPyAgent(program_factory, input_field="question", output_field="answer", history_field="history")`:
 
 - `input_field` receives the latest user message.
