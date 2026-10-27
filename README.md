@@ -2,6 +2,8 @@
 
 [AG-UI](https://docs.ag-ui.com) integration for [DSPy](https://dspy.ai): expose any `dspy.Module` as an AG-UI agent, so CopilotKit and every other AG-UI client can drive it.
 
+A community integration, maintained here and not by the AG-UI or DSPy teams. It follows the same package shape as the integrations in the AG-UI repo (`ag_ui_<framework>`, a `<Framework>Agent`, an `add_<framework>_fastapi_endpoint` helper) so it feels familiar next to them.
+
 Backend tool calls, streamed answer text, conversation history and frontend (client-executed) tools all map onto the protocol with no changes to DSPy. The bridge uses two hooks DSPy already has: `dspy.streamify` and `BaseCallback`.
 
 ```
@@ -36,6 +38,8 @@ To prove it is the protocol as published and not just our page, drive the same s
 cd examples/node-client && npm install && npm start -- "weather in Tokyo?"
 ```
 
+From CopilotKit or any other AG-UI client, point an `HttpAgent` at the endpoint URL. No client-side package from this repo is needed.
+
 ## Use it on your own module
 
 ```python
@@ -54,7 +58,7 @@ app = FastAPI()
 add_dspy_fastapi_endpoint(app, DSPyAgent(make_agent), path="/agent")
 ```
 
-`add_dspy_fastapi_endpoint` is a convenience, the same helper shape as `add_langgraph_fastapi_endpoint` and `add_adk_fastapi_endpoint` in the other Python integrations. The route it registers is this, so write it yourself when you need auth, middleware or another framework:
+`add_dspy_fastapi_endpoint` is a convenience, the same helper shape as `add_langgraph_fastapi_endpoint` and `add_adk_fastapi_endpoint` in the AG-UI repo's own integrations. The route it registers is this, so write it yourself when you need auth, middleware or another framework:
 
 ```python
 from ag_ui.core import RunAgentInput

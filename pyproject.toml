@@ -6,11 +6,15 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 keywords = ["ag-ui", "dspy", "agent", "protocol", "llm", "streaming"]
+authors = [{ name = "Will Abbott" }]
 dependencies = [
     "ag-ui-protocol>=1.0.0",
     "dspy>=3.0",
     "fastapi>=0.115",
 ]
+
+[project.urls]
+Repository = "https://github.com/wrabit/ag-ui-dspy"
 
 [project.optional-dependencies]
 examples = [
