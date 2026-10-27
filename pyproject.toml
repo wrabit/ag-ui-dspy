@@ -5,6 +5,17 @@ description = "AG-UI protocol integration for DSPy: expose any dspy.Module as an
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Framework :: FastAPI",
+    "Topic :: Software Development :: Libraries",
+]
 keywords = ["ag-ui", "dspy", "agent", "protocol", "llm", "streaming"]
 authors = [{ name = "Will Abbott" }]
 dependencies = [
@@ -15,6 +26,8 @@ dependencies = [
 
 [project.urls]
 Repository = "https://github.com/wrabit/ag-ui-dspy"
+Issues = "https://github.com/wrabit/ag-ui-dspy/issues"
+"AG-UI docs" = "https://docs.ag-ui.com"
 
 [project.optional-dependencies]
 examples = [

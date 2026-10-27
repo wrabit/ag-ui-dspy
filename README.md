@@ -17,9 +17,16 @@ examples/static/index.html  ──POST RunAgentInput──▶  /agent (FastAPI)
                                                        dspy.ReAct(...)
 ```
 
+## Install
+
+```bash
+pip install ag-ui-dspy        # or: uv add ag-ui-dspy
+```
+
 ## Run the demo
 
 ```bash
+git clone https://github.com/wrabit/ag-ui-dspy && cd ag-ui-dspy
 uv sync --all-groups
 cp .env.example .env          # pick a model: any LiteLLM string, local or hosted
 set -a; source .env; set +a
@@ -120,6 +127,10 @@ uv run pytest
 ```
 
 The tests run against `dspy.utils.dummies.DummyLM`, so no network or key is needed.
+
+## Releasing
+
+Bump `version` in `pyproject.toml`, commit, then `git tag v0.1.0 && git push --tags`. The publish workflow builds, tests and uploads to PyPI through trusted publishing.
 
 ## License
 
