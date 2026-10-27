@@ -6,34 +6,6 @@ A community integration, maintained here and not by the AG-UI or DSPy teams. It 
 
 Backend tool calls, streamed answer text, conversation history and frontend (client-executed) tools all map onto the protocol with no changes to DSPy. The bridge uses two hooks DSPy already has: `dspy.streamify` and `BaseCallback`.
 
-```mermaid
-sequenceDiagram
-    participant C as AG-UI client<br/>(CopilotKit, HttpAgent, the demo page)
-    participant E as POST /agent<br/>(FastAPI)
-    participant A as DSPyAgent
-    participant S as dspy.streamify<br/>+ AgUiCallback
-    participant M as dspy.Module<br/>(e.g. ReAct)
-
-    C->>E: RunAgentInput (messages, tools, state)
-    E->>A: run(run_input)
-    A-->>C: RUN_STARTED
-    A->>S: program(question, history)
-    S->>M: forward()
-    loop each tool the module calls
-        M->>S: on_tool_start (call_id, name, args)
-        S-->>A: ToolStart
-        A-->>C: TOOL_CALL_START / ARGS / END
-        M->>S: on_tool_end (call_id, result)
-        S-->>A: ToolEnd
-        A-->>C: TOOL_CALL_RESULT
-    end
-    M-->>S: answer tokens
-    S-->>A: StreamResponse chunks
-    A-->>C: TEXT_MESSAGE_START, CONTENT..., END
-    A-->>C: RUN_FINISHED
-    Note over C,M: A frontend tool (from RunAgentInput.tools) ends the run after TOOL_CALL_END.<br/>The client executes it and starts a new run with a ToolMessage.
-```
-
 
 ## Install
 
