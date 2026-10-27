@@ -1,0 +1,7 @@
+{
+  "name": "ag-ui-dspy-node-client",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node client.mjs" },
+  "dependencies": { "@ag-ui/client": "^0.0.40" }
+}

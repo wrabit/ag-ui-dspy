@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ag-ui-dspy demo</title>
+<style>
+  :root { --bg:#f6f7f9; --panel:#fff; --ink:#1b1f24; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; --tool:#fef3c7; --tool-ink:#92400e; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --panel:#171a21; --ink:#e6e8eb; --muted:#9aa3ad; --line:#2a2f3a; --accent:#60a5fa; --tool:#3b2f0b; --tool-ink:#fcd34d; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); background:var(--panel); display:flex; gap:12px; align-items:baseline; }
+  header h1 { font-size:16px; margin:0; } header span { color:var(--muted); font-size:13px; }
+  main { display:grid; grid-template-columns: 1fr 380px; gap:0; height:calc(100vh - 49px); }
+  @media (max-width: 900px) { main { grid-template-columns:1fr; } #events { display:none; } }
+  #chat { display:flex; flex-direction:column; min-width:0; }
+  #log { flex:1; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .msg { max-width:720px; padding:10px 14px; border-radius:12px; white-space:pre-wrap; }
+  .user { align-self:flex-end; background:var(--accent); color:#fff; }
+  .assistant { align-self:flex-start; background:var(--panel); border:1px solid var(--line); }
+  .tool { align-self:flex-start; background:var(--tool); color:var(--tool-ink); font-family:ui-monospace, monospace; font-size:13px; }
+  .tool b { display:block; margin-bottom:4px; }
+  .choice { align-self:flex-start; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; }
+  .choice button { margin:6px 6px 0 0; padding:6px 12px; border-radius:8px; border:1px solid var(--accent); background:transparent; color:var(--accent); cursor:pointer; }
+  .choice button:hover { background:var(--accent); color:#fff; }
+  form { display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--line); background:var(--panel); }
+  input { flex:1; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:15px; }
+  button.send { padding:10px 16px; border-radius:8px; border:0; background:var(--accent); color:#fff; cursor:pointer; }
+  #events { border-left:1px solid var(--line); background:var(--panel); overflow:auto; padding:12px; font:12px/1.4 ui-monospace, monospace; }
+  #events h2 { font-size:12px; margin:0 0 8px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  #events div { padding:2px 0; border-bottom:1px dashed var(--line); word-break:break-all; }
+  #events .t { color:var(--accent); }
+  .status { color:var(--muted); font-size:13px; align-self:flex-start; }
+</style>
+</head>
+<body>
+<header><h1>ag-ui-dspy</h1><span>a dspy.ReAct agent behind the AG-UI protocol. Try: “weather in Kraków?”, “what is 12 * (3+4)?”, “help me pick a city for a weekend”.</span></header>
+<main>
+  <section id="chat">
+    <div id="log"></div>
+    <form id="form"><input id="input" autocomplete="off" placeholder="Message the agent…" autofocus><button class="send">Send</button></form>
+  </section>
+  <aside id="events"><h2>AG-UI events</h2></aside>
+</main>
+<script>
+// A minimal AG-UI client with no build step: keeps the message list in the
+// protocol's own shape, POSTs RunAgentInput, parses the SSE event stream.
+const ENDPOINT = "/agent";
+const threadId = crypto.randomUUID();
+const messages = [];               // AG-UI Message[]
+const FRONTEND_TOOLS = [{
+  name: "pick_option",
+  description: "Ask the user to choose one option from a short list. Returns the chosen option.",
+  parameters: { type: "object", properties: {
+    prompt: { type: "string", description: "the question to show the user" },
+    options: { type: "array", items: { type: "string" }, description: "2 to 5 options" }
+  }, required: ["prompt", "options"] }
+}];
+
+const log = document.getElementById("log"), events = document.getElementById("events");
+const el = (cls, text) => { const d = document.createElement("div"); d.className = cls; if (text != null) d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; return d; };
+const logEvent = ev => { const d = document.createElement("div"); const { type, ...rest } = ev; d.innerHTML = `<span class="t">${type}</span> ${JSON.stringify(rest)}`; events.appendChild(d); events.scrollTop = events.scrollHeight; };
+
+document.getElementById("form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const input = document.getElementById("input"); const text = input.value.trim(); if (!text) return; input.value = "";
+  messages.push({ id: crypto.randomUUID(), role: "user", content: text });
+  el("msg user", text);
+  await run();
+});
+
+async function run() {
+  const runId = crypto.randomUUID();
+  const body = { threadId, runId, state: {}, messages, tools: FRONTEND_TOOLS, context: [], forwardedProps: {} };
+  const res = await fetch(ENDPOINT, { method: "POST", headers: { "content-type": "application/json", accept: "text/event-stream" }, body: JSON.stringify(body) });
+  const reader = res.body.getReader(), dec = new TextDecoder(); let buf = "";
+  const textEls = {}, toolEls = {}, pendingCalls = {}; let assistant = { id: null, role: "assistant", content: "", toolCalls: [] };
+  while (true) {
+    const { value, done } = await reader.read(); if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i; while ((i = buf.indexOf("\n\n")) >= 0) {
+      const frame = buf.slice(0, i); buf = buf.slice(i + 2);
+      const line = frame.split("\n").find(l => l.startsWith("data:")); if (!line) continue;
+      const ev = JSON.parse(line.slice(5)); logEvent(ev); handle(ev);
+    }
+  }
+  function handle(ev) {
+    switch (ev.type) {
+      case "TEXT_MESSAGE_START": assistant.id = ev.messageId; textEls[ev.messageId] = el("msg assistant", ""); break;
+      case "TEXT_MESSAGE_CONTENT": assistant.content += ev.delta; textEls[ev.messageId].textContent += ev.delta; log.scrollTop = log.scrollHeight; break;
+      case "TOOL_CALL_START": pendingCalls[ev.toolCallId] = { id: ev.toolCallId, type: "function", function: { name: ev.toolCallName, arguments: "" } };
+        toolEls[ev.toolCallId] = el("msg tool"); toolEls[ev.toolCallId].innerHTML = `<b>⚙ ${ev.toolCallName}</b>`; break;
+      case "TOOL_CALL_ARGS": pendingCalls[ev.toolCallId].function.arguments += ev.delta; break;
+      case "TOOL_CALL_END": { const c = pendingCalls[ev.toolCallId]; assistant.toolCalls.push(c); toolEls[c.id].append(c.function.arguments); break; }
+      case "TOOL_CALL_RESULT": toolEls[ev.toolCallId].append("\n→ " + ev.content); break;
+      case "STEP_STARTED": el("status", ev.stepName); break;
+      case "RUN_ERROR": el("status", "error: " + ev.message); break;
+      case "RUN_FINISHED": finish(); break;
+    }
+  }
+  function finish() {
+    // Record what the agent said, in AG-UI message shape, for the next run.
+    if (assistant.content || assistant.toolCalls.length) {
+      messages.push({ id: assistant.id || crypto.randomUUID(), role: "assistant", content: assistant.content || undefined, toolCalls: assistant.toolCalls.length ? assistant.toolCalls : undefined });
+    }
+    // Backend tools already carry results. A frontend tool is ours to execute:
+    const fe = assistant.toolCalls.filter(c => FRONTEND_TOOLS.some(t => t.name === c.function.name));
+    for (const c of fe) {
+      const args = JSON.parse(c.function.arguments || "{}");
+      const box = el("choice", args.prompt || "Choose:");
+      for (const opt of args.options || []) {
+        const b = document.createElement("button"); b.textContent = opt;
+        b.onclick = async () => { box.remove(); el("msg user", opt);
+          messages.push({ id: crypto.randomUUID(), role: "tool", toolCallId: c.id, content: opt });
+          await run(); };
+        box.appendChild(b);
+      }
+    }
+  }
+}
+</script>
+</body>
+</html>

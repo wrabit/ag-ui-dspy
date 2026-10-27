@@ -1,0 +1,36 @@
+[project]
+name = "ag-ui-dspy"
+version = "0.1.0"
+description = "AG-UI protocol integration for DSPy: expose any dspy.Module as an AG-UI agent."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+keywords = ["ag-ui", "dspy", "agent", "protocol", "llm", "streaming"]
+dependencies = [
+    "ag-ui-protocol>=1.0.0",
+    "dspy>=3.0",
+    "fastapi>=0.115",
+]
+
+[project.optional-dependencies]
+examples = [
+    "uvicorn[standard]>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "httpx>=0.28",
+    "uvicorn[standard]>=0.30",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.0,<0.9"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "ag_ui_dspy"
+module-root = ""
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
