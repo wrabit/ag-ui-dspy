@@ -77,14 +77,19 @@ class DSPyAgent:
 
         program = self.program_factory(_frontend_tools(run_input.tools))
         # streamify snapshots settings.callbacks when called, so register ours first.
+        # Stream the reply token by token only when exactly one predictor generates the output
+        # field. ReActV2 returns it through its submit tool (no predictor has it); a module where
+        # several predictors share the field, or post-processes it, gets the final value whole.
+        owners = [p for _, p in program.named_predictors() if self.output_field in p.signature.output_fields]
+        listeners = [StreamListener(signature_field_name=self.output_field)] if len(owners) == 1 else []
         with dspy.context(callbacks=[*dspy.settings.callbacks, AgUiCallback()]):
             streamer = dspy.streamify(
                 program,
                 status_message_provider=_Quiet(),
-                stream_listeners=[StreamListener(signature_field_name=self.output_field)],
+                stream_listeners=listeners,
                 include_final_prediction_in_output_stream=True,
             )
-        kwargs = self._inputs(run_input.messages)
+        kwargs = self._inputs(run_input.messages, react_v2=isinstance(program, dspy.ReActV2))
         message_id = f"{run_id}-reply"
         started = False
         streamed = ""
@@ -138,11 +143,14 @@ class DSPyAgent:
         yield RunFinishedEvent(type=T.RUN_FINISHED, thread_id=thread_id, run_id=run_id)
 
     # ------------------------------------------------------------- messages
-    def _inputs(self, messages: list[Message]) -> dict[str, Any]:
+    def _inputs(self, messages: list[Message], react_v2: bool = False) -> dict[str, Any]:
         """Map the AG-UI message list onto the module's inputs.
 
         * Completed turns (user -> assistant, with any tool exchange) become
-          ``dspy.History`` entries of ``{input_field, output_field}``.
+          ``dspy.History`` entries of ``{input_field, output_field}``. For a
+          ``dspy.ReActV2`` program they are shaped like its own history events
+          (a ``submit`` tool call carrying the answer), since its predictor
+          only renders ``next_thought`` / ``tool_calls`` for past turns.
         * The last user message is the question.
         * Tool results that follow it (a frontend tool the client has just
           executed) are appended to the question, so the next ReAct trajectory
@@ -180,8 +188,20 @@ class DSPyAgent:
         question = "\n\n".join([last_user, *trailing])
         kwargs = {self.input_field: question}
         if self.history_field:
+            if react_v2:
+                turns = [_react_v2_event(t, self.input_field, self.output_field, i) for i, t in enumerate(turns)]
             kwargs[self.history_field] = dspy.History(messages=turns)
         return kwargs
+
+
+def _react_v2_event(turn: dict[str, str], input_field: str, output_field: str, index: int) -> dict[str, Any]:
+    """One past turn in the shape dspy.ReActV2 records: inputs, a submit call with the outputs, and the outputs."""
+    from dspy.adapters.types.tool import ToolCallResults, ToolCalls
+
+    outputs = {output_field: turn[output_field]}
+    calls = ToolCalls(tool_calls=[ToolCalls.ToolCall(id=f"history-{index}", name="submit", args=outputs)])
+    results = ToolCallResults.from_tool_calls_and_values(calls, [outputs], [False])
+    return {input_field: turn[input_field], "tool_calls": calls.model_copy(update={"tool_call_results": results}), **outputs}
 
 
 def _frontend_tools(tools: list[Tool]) -> list[dspy.Tool]:

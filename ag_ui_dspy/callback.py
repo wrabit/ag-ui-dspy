@@ -52,7 +52,7 @@ class FrontendToolCall(BaseException):
 class AgUiCallback(BaseCallback):
     """Pushes tool starts/ends onto the streamify stream as structured objects."""
 
-    skip = {"finish"}  # ReAct's internal terminator is not a real tool
+    skip = {"finish", "submit"}  # ReAct's terminator and ReActV2's final-output tool are not real tools
 
     def on_tool_start(self, call_id: str, instance: Any, inputs: dict[str, Any]):
         stream = settings.send_stream

@@ -1,4 +1,4 @@
-"""The demo agent: a dspy.ReAct with two backend tools.
+"""The demo agent: a dspy.ReActV2 with two backend tools.
 
 Frontend tools arrive per request from the AG-UI client (see static/index.html,
 which declares ``pick_option``). The factory receives them already wrapped as
@@ -53,12 +53,13 @@ class Assistant(dspy.Signature):
     If a question needs a choice from the user and a frontend tool for that exists, call it."""
 
     question: str = dspy.InputField()
-    history: dspy.History = dspy.InputField(desc="earlier turns of this conversation")
     answer: str = dspy.OutputField()
 
 
 def make_agent(frontend_tools: list[dspy.Tool]) -> dspy.Module:
-    return dspy.ReAct(Assistant, tools=[get_weather, calculate, *frontend_tools], max_iters=6)
+    # ReActV2 keeps the conversation in its own `history` forward argument (the adapter passes it),
+    # so the signature must not declare a history field; it also reserves the `tools` input name.
+    return dspy.ReActV2(Assistant, tools=[get_weather, calculate, *frontend_tools], max_iters=6)
 
 
 def configure_lm() -> dspy.LM:
