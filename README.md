@@ -2,9 +2,9 @@
 
 Puts a [DSPy](https://dspy.ai) module behind an [AG-UI](https://docs.ag-ui.com) endpoint, so you can use CopilotKit or any other AG-UI front end with it.
 
-A community integration, maintained here and not by the AG-UI or DSPy teams. It uses the same package layout and names as the integrations in the AG-UI repo: `ag_ui_<framework>`, a `<Framework>Agent`, an `add_<framework>_fastapi_endpoint` helper.
+This is a community integration, maintained here rather than by the AG-UI or DSPy teams. The package layout and names follow the integrations in the AG-UI repo: `ag_ui_<framework>`, a `<Framework>Agent`, an `add_<framework>_fastapi_endpoint` helper.
 
-Backend tool calls, streamed answer text, conversation history and frontend (client-executed) tools all map onto the protocol with no changes to DSPy. The bridge uses two hooks DSPy already has: `dspy.streamify` and `BaseCallback`.
+It handles backend tool calls, streamed answers, conversation history and frontend (client-executed) tools, using two hooks DSPy already has: `dspy.streamify` and `BaseCallback`. No changes to DSPy are needed.
 
 
 ## Install
@@ -35,7 +35,7 @@ To check the server against the official TypeScript client rather than the demo 
 cd examples/node-client && npm install && npm start -- "weather in Tokyo?"
 ```
 
-From CopilotKit or any other AG-UI client, point an `HttpAgent` at the endpoint URL. No client-side package from this repo is needed.
+From CopilotKit or any other AG-UI client, point an `HttpAgent` at the endpoint URL. You don't need anything from this repo on the client side.
 
 ## Use it on your own module
 
@@ -54,7 +54,7 @@ app = FastAPI()
 add_dspy_fastapi_endpoint(app, DSPyAgent(make_agent), path="/agent")
 ```
 
-`add_dspy_fastapi_endpoint` is a convenience, named like `add_langgraph_fastapi_endpoint` and `add_adk_fastapi_endpoint` in the AG-UI repo's own integrations. This is the route it registers; write it yourself when you need auth, middleware or another framework:
+`add_dspy_fastapi_endpoint` registers the route below. Write it yourself if you need auth, middleware or a different framework. The name follows `add_langgraph_fastapi_endpoint` and `add_adk_fastapi_endpoint` in the AG-UI repo.
 
 ```python
 from ag_ui.core import RunAgentInput
@@ -85,9 +85,9 @@ async def agent_endpoint(run_input: RunAgentInput, request: Request):
 
 The factory is called once per run so each run sees that request's frontend tools.
 
-The agent loop is `dspy.ReActV2`. The adapter passes the conversation as its `history` argument in the format the loop records its own turns in, so the model sees earlier replies, keeps its internal `submit` tool out of the tool events, and emits the answer when the loop finishes. DSPy is pinned to the 3.4 series because 3.5 renames that loop to `dspy.ReAct`; the pin moves with the adapter.
+The agent loop is `dspy.ReActV2`. The adapter passes the conversation in as its `history` argument, in the same format ReActV2 uses for its own turns, hides its internal `submit` tool from the tool events, and sends the answer when the loop finishes. DSPy is pinned to 3.4.x because 3.5 renames ReActV2 to `dspy.ReAct`; the pin will move when the adapter does.
 
-Any other module works too. A plain `dspy.Predict` or `ChainOfThought` streams its answer and never emits tool events, which makes it the quickest way to see the plumbing before adding tools:
+Any other module works too. `dspy.Predict` or `ChainOfThought` streams its answer and emits no tool events:
 
 ```python
 DSPyAgent(lambda frontend_tools: dspy.Predict("question, history: dspy.History -> answer"))
@@ -105,11 +105,11 @@ DSPyAgent(lambda frontend_tools: dspy.Predict("question, history: dspy.History -
 | frontend tool chosen by the LM | `TOOL_CALL_*` then `RUN_FINISHED` with no result; the client executes it and starts a new run |
 | exception | `RUN_ERROR` |
 
-`dspy.streamify` runs the program with a send stream in its settings and passes through any object it does not recognise. `AgUiCallback` drops small `ToolStart`/`ToolEnd` dataclasses onto that stream, so the adapter gets structured tool events with DSPy's own `call_id`, not parsed status strings.
+`dspy.streamify` passes through any object it doesn't recognise on its stream. `AgUiCallback` puts `ToolStart`/`ToolEnd` dataclasses on it, so tool events carry DSPy's own `call_id` instead of being parsed out of status strings.
 
 Frontend tools become `dspy.Tool` stubs that raise `FrontendToolCall`. It subclasses `BaseException` because the agent loop catches `Exception` and would record it as an "Execution error" observation instead of stopping.
 
-History: the AG-UI message list is folded into `dspy.History` turns of `{input_field, output_field}`. Assistant tool calls and tool results are appended to the previous turn's answer as text, so a run after a frontend tool round-trip starts a fresh trajectory that can see what happened.
+History: the AG-UI messages become `dspy.History` turns of `{input_field, output_field}`. Tool calls and results are appended to the previous answer as text, so a run after a frontend tool round-trip can see what happened.
 
 ## Not covered yet
 
