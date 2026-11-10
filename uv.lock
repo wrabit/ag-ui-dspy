@@ -8,7 +8,7 @@ resolution-markers = [
 
 [[package]]
 name = "ag-ui-dspy"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "ag-ui-protocol" },
@@ -31,7 +31,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "ag-ui-protocol", specifier = ">=1.0.0" },
-    { name = "dspy", specifier = ">=3.0" },
+    { name = "dspy", specifier = ">=3.4,<3.5" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'examples'", specifier = ">=0.30" },
 ]

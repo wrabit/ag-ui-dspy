@@ -49,9 +49,6 @@ def make_agent(frontend_tools: list[dspy.Tool]) -> dspy.Module:
     # wrapped as dspy.Tool stubs; include them if you want the LM to use them.
     return dspy.ReActV2("question -> answer", tools=[my_tool, *frontend_tools])
 
-# or the classic ReAct, which takes the conversation as a signature field:
-# dspy.ReAct("question, history: dspy.History -> answer", tools=[...])
-
 dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
 app = FastAPI()
 add_dspy_fastapi_endpoint(app, DSPyAgent(make_agent), path="/agent")
@@ -83,12 +80,18 @@ async def agent_endpoint(run_input: RunAgentInput, request: Request):
 `DSPyAgent(program_factory, input_field="question", output_field="answer", history_field="history")`:
 
 - `input_field` receives the latest user message.
-- `output_field` is streamed as the assistant reply (token by token when the LM streams).
+- `output_field` is the assistant reply: streamed token by token when a predictor generates it as text, sent whole when the agent loop returns it.
 - `history_field`, if set, receives earlier turns as a `dspy.History`. Set it to `None` for a stateless module.
 
-The factory is called once per run so each run sees that request's frontend tools. Any module works, not only ReAct; a plain `dspy.Predict` or `ChainOfThought` just never emits tool events.
+The factory is called once per run so each run sees that request's frontend tools.
 
-`dspy.ReActV2` (DSPy 3.4, experimental) is handled specially. It reserves `history` and `tools` as input names, takes the conversation as a `history=` argument to `forward` instead of a signature field, and returns the answer through an internal `submit` tool rather than a generated text field. The adapter passes the history as that argument, shapes each past turn the way ReActV2 records its own (a `submit` call carrying the answer, so the model actually sees earlier replies), hides `submit` from the tool events, and emits the answer as one content event when the run finishes, since there is nothing to stream token by token.
+The agent loop is `dspy.ReActV2`. The adapter passes the conversation as its `history` argument, shaped the way the loop records its own turns so the model sees earlier replies, keeps its internal `submit` tool out of the tool events, and emits the answer when the loop finishes. DSPy is pinned to the 3.4 series because 3.5 renames that loop to `dspy.ReAct`; the pin moves with the adapter.
+
+Any other module works too. A plain `dspy.Predict` or `ChainOfThought` streams its answer and never emits tool events, which makes it the quickest way to see the plumbing before adding tools:
+
+```python
+DSPyAgent(lambda frontend_tools: dspy.Predict("question, history: dspy.History -> answer"))
+```
 
 ## How the mapping works
 
@@ -97,23 +100,23 @@ The factory is called once per run so each run sees that request's frontend tool
 | `BaseCallback.on_tool_start` | `TOOL_CALL_START`, `TOOL_CALL_ARGS`, `TOOL_CALL_END` |
 | `BaseCallback.on_tool_end` | `TOOL_CALL_RESULT` |
 | `StreamListener` chunk on the output field | `TEXT_MESSAGE_START` once, then `TEXT_MESSAGE_CONTENT` (listener attached only when exactly one predictor generates the field) |
-| final `dspy.Prediction` | `TEXT_MESSAGE_END` (whole answer first if nothing streamed: cache hit, ReActV2's `submit`, a field shared by several predictors or post-processed in Python) |
+| final `dspy.Prediction` | `TEXT_MESSAGE_END` (whole answer first if nothing streamed: the agent loop's `submit`, a cache hit, a field shared by several predictors or post-processed in Python) |
 | `StatusMessage` | `STEP_STARTED` |
 | frontend tool chosen by the LM | `TOOL_CALL_*` then `RUN_FINISHED` with no result; the client executes it and starts a new run |
 | exception | `RUN_ERROR` |
 
 `dspy.streamify` runs the program with a send stream in its settings and passes through any object it does not recognise. `AgUiCallback` drops small `ToolStart`/`ToolEnd` dataclasses onto that stream, so the adapter gets structured tool events with DSPy's own `call_id`, not parsed status strings.
 
-Frontend tools become `dspy.Tool` stubs that raise `FrontendToolCall`. It subclasses `BaseException` because `dspy.ReAct` and `dspy.ReActV2` catch `Exception` and would record it as an "Execution error" observation instead of stopping the loop.
+Frontend tools become `dspy.Tool` stubs that raise `FrontendToolCall`. It subclasses `BaseException` because the agent loop catches `Exception` and would record it as an "Execution error" observation instead of stopping.
 
-History: the AG-UI message list is folded into `dspy.History` turns of `{input_field, output_field}`. Assistant tool calls and tool results are appended to the previous turn's answer as text, so a ReAct run after a frontend tool round-trip starts a fresh trajectory that can see what happened.
+History: the AG-UI message list is folded into `dspy.History` turns of `{input_field, output_field}`. Assistant tool calls and tool results are appended to the previous turn's answer as text, so a run after a frontend tool round-trip starts a fresh trajectory that can see what happened.
 
 ## Not covered yet
 
 - Shared state (`STATE_SNAPSHOT` / `STATE_DELTA`). DSPy has no state concept; a `state` input field plus a `CUSTOM` event would be the natural shape.
-- Reasoning events. ReAct's and ReActV2's `next_thought` could be streamed with a second `StreamListener(allow_reuse=True)` onto `REASONING_MESSAGE_*`.
-- Token streaming of the final answer with ReActV2: the answer arrives as `submit` tool arguments, so it is emitted whole at the end.
-- The ReAct trajectory does not survive a frontend tool round-trip; only its text summary does.
+- Reasoning events. The loop's `next_thought` could be streamed with a second `StreamListener(allow_reuse=True)` onto `REASONING_MESSAGE_*`.
+- Token streaming of the final answer from the agent loop: it arrives as `submit` tool arguments, so it is emitted whole at the end.
+- The loop's trajectory does not survive a frontend tool round-trip; only its text summary does.
 
 ## Tests
 
@@ -125,7 +128,7 @@ The tests run against `dspy.utils.dummies.DummyLM`, so no network or key is need
 
 ## Releasing
 
-Bump `version` in `pyproject.toml`, commit, then `git tag v0.1.0 && git push --tags`. The publish workflow builds, tests and uploads to PyPI through trusted publishing.
+Bump `version` in `pyproject.toml`, commit, then `git tag vX.Y.Z && git push origin main vX.Y.Z`. The publish workflow builds, tests and uploads to PyPI through trusted publishing.
 
 ## License
 

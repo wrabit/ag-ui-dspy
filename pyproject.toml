@@ -1,6 +1,6 @@
 [project]
 name = "ag-ui-dspy"
-version = "0.1.0"
+version = "0.1.1"
 description = "AG-UI protocol integration for DSPy: expose any dspy.Module as an AG-UI agent."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,7 +20,7 @@ keywords = ["ag-ui", "dspy", "agent", "protocol", "llm", "streaming"]
 authors = [{ name = "Will Abbott" }]
 dependencies = [
     "ag-ui-protocol>=1.0.0",
-    "dspy>=3.0",
+    "dspy>=3.4,<3.5",  # ReActV2 is experimental and becomes dspy.ReAct in 3.5; move the pin on purpose
     "fastapi>=0.115",
 ]
 
