@@ -2,7 +2,7 @@
 
 Puts a [DSPy](https://dspy.ai) module behind an [AG-UI](https://docs.ag-ui.com) endpoint, so you can use CopilotKit or any other AG-UI front end with it.
 
-This is a community integration, maintained here rather than by the AG-UI or DSPy teams. The package layout and names follow the integrations in the AG-UI repo: `ag_ui_<framework>`, a `<Framework>Agent`, an `add_<framework>_fastapi_endpoint` helper.
+The naming in this integration follows the integrations in the AG-UI repo: `ag_ui_<framework>`, a `<Framework>Agent`, an `add_<framework>_fastapi_endpoint` helper.
 
 It handles backend tool calls, streamed answers, conversation history and frontend (client-executed) tools, using two hooks DSPy already has: `dspy.streamify` and `BaseCallback`. No changes to DSPy are needed.
 
