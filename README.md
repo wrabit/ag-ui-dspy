@@ -113,10 +113,8 @@ History: the AG-UI message list is folded into `dspy.History` turns of `{input_f
 
 ## Not covered yet
 
-- Shared state (`STATE_SNAPSHOT` / `STATE_DELTA`). DSPy has no state concept; a `state` input field plus a `CUSTOM` event would be the natural shape.
-- Reasoning events. The loop's `next_thought` could be streamed with a second `StreamListener(allow_reuse=True)` onto `REASONING_MESSAGE_*`.
-- Token streaming of the final answer from the agent loop: it arrives as `submit` tool arguments, so it is emitted whole at the end.
-- The loop's trajectory does not survive a frontend tool round-trip; only its text summary does.
+- Shared state (`STATE_SNAPSHOT` / `STATE_DELTA`). The natural shape is a `state` input field fed from `RunAgentInput.state` and a snapshot emitted when the module returns one.
+- The loop's own tool calls from an interrupted turn reach the next run as text in the history, not as the structured calls ReActV2 records itself.
 
 ## Tests
 
