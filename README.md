@@ -1,6 +1,6 @@
 # ag-ui-dspy
 
-[AG-UI](https://docs.ag-ui.com) integration for [DSPy](https://dspy.ai). It serves a `dspy.Module` as an AG-UI agent: the module receives the messages, tools and state an AG-UI client sends, and its run is streamed back as the protocol's events, so CopilotKit or any other AG-UI client can be its front end.
+Puts a [DSPy](https://dspy.ai) module behind an [AG-UI](https://docs.ag-ui.com) endpoint, so you can use CopilotKit or any other AG-UI front end with it.
 
 A community integration, maintained here and not by the AG-UI or DSPy teams. It uses the same package layout and names as the integrations in the AG-UI repo: `ag_ui_<framework>`, a `<Framework>Agent`, an `add_<framework>_fastapi_endpoint` helper.
 
