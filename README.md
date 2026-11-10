@@ -2,7 +2,7 @@
 
 [AG-UI](https://docs.ag-ui.com) integration for [DSPy](https://dspy.ai): expose any `dspy.Module` as an AG-UI agent, so CopilotKit and every other AG-UI client can drive it.
 
-A community integration, maintained here and not by the AG-UI or DSPy teams. It follows the same package shape as the integrations in the AG-UI repo (`ag_ui_<framework>`, a `<Framework>Agent`, an `add_<framework>_fastapi_endpoint` helper) so it feels familiar next to them.
+A community integration, maintained here and not by the AG-UI or DSPy teams. It uses the same package layout and names as the integrations in the AG-UI repo: `ag_ui_<framework>`, a `<Framework>Agent`, an `add_<framework>_fastapi_endpoint` helper.
 
 Backend tool calls, streamed answer text, conversation history and frontend (client-executed) tools all map onto the protocol with no changes to DSPy. The bridge uses two hooks DSPy already has: `dspy.streamify` and `BaseCallback`.
 
@@ -29,7 +29,7 @@ Open http://localhost:8040. The left pane is a chat, the right pane shows every 
 - "what is 12 * (3 + 4)?" (backend tool)
 - "help me pick a city for a weekend" (the agent calls the frontend tool `pick_option`; the page renders buttons; your click goes back as a `ToolMessage` in the next run)
 
-To prove it is the protocol as published and not just our page, drive the same server with the official TypeScript client:
+To check the server against the official TypeScript client rather than the demo page:
 
 ```bash
 cd examples/node-client && npm install && npm start -- "weather in Tokyo?"
@@ -54,7 +54,7 @@ app = FastAPI()
 add_dspy_fastapi_endpoint(app, DSPyAgent(make_agent), path="/agent")
 ```
 
-`add_dspy_fastapi_endpoint` is a convenience, the same helper shape as `add_langgraph_fastapi_endpoint` and `add_adk_fastapi_endpoint` in the AG-UI repo's own integrations. The route it registers is this, so write it yourself when you need auth, middleware or another framework:
+`add_dspy_fastapi_endpoint` is a convenience, named like `add_langgraph_fastapi_endpoint` and `add_adk_fastapi_endpoint` in the AG-UI repo's own integrations. This is the route it registers; write it yourself when you need auth, middleware or another framework:
 
 ```python
 from ag_ui.core import RunAgentInput
@@ -75,7 +75,7 @@ async def agent_endpoint(run_input: RunAgentInput, request: Request):
     return StreamingResponse(events(), media_type=encoder.get_content_type())
 ```
 
-`DSPyAgent.run(run_input)` is the whole contract: `RunAgentInput` in, an async iterator of `ag_ui.core` events out. Anything that can stream server-sent events can serve it.
+`DSPyAgent.run(run_input)` takes a `RunAgentInput` and returns an async iterator of `ag_ui.core` events. Anything that can stream server-sent events can serve it.
 
 `DSPyAgent(program_factory, input_field="question", output_field="answer", history_field="history")`:
 
@@ -85,7 +85,7 @@ async def agent_endpoint(run_input: RunAgentInput, request: Request):
 
 The factory is called once per run so each run sees that request's frontend tools.
 
-The agent loop is `dspy.ReActV2`. The adapter passes the conversation as its `history` argument, shaped the way the loop records its own turns so the model sees earlier replies, keeps its internal `submit` tool out of the tool events, and emits the answer when the loop finishes. DSPy is pinned to the 3.4 series because 3.5 renames that loop to `dspy.ReAct`; the pin moves with the adapter.
+The agent loop is `dspy.ReActV2`. The adapter passes the conversation as its `history` argument in the format the loop records its own turns in, so the model sees earlier replies, keeps its internal `submit` tool out of the tool events, and emits the answer when the loop finishes. DSPy is pinned to the 3.4 series because 3.5 renames that loop to `dspy.ReAct`; the pin moves with the adapter.
 
 Any other module works too. A plain `dspy.Predict` or `ChainOfThought` streams its answer and never emits tool events, which makes it the quickest way to see the plumbing before adding tools:
 
@@ -113,8 +113,8 @@ History: the AG-UI message list is folded into `dspy.History` turns of `{input_f
 
 ## Not covered yet
 
-- Shared state (`STATE_SNAPSHOT` / `STATE_DELTA`). The natural shape is a `state` input field fed from `RunAgentInput.state` and a snapshot emitted when the module returns one.
-- The loop's own tool calls from an interrupted turn reach the next run as text in the history, not as the structured calls ReActV2 records itself.
+- Shared state (`STATE_SNAPSHOT` / `STATE_DELTA`). DSPy doesn't have a state concept, so `RunAgentInput.state` is ignored and no state events are emitted. Supporting it would mean passing the state into a `state` input field and emitting a snapshot when the module returns one.
+- When a frontend tool interrupts a turn, the tool calls the loop made before it are passed to the next run as text in the history, not as the structured tool calls ReActV2 records itself.
 
 ## Tests
 
