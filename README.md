@@ -114,7 +114,6 @@ History: the AG-UI messages become `dspy.History` turns of `{input_field, output
 ## Not covered yet
 
 - Shared state (`STATE_SNAPSHOT` / `STATE_DELTA`). DSPy doesn't have a state concept, so `RunAgentInput.state` is ignored and no state events are emitted. Supporting it would mean passing the state into a `state` input field and emitting a snapshot when the module returns one.
-- When a frontend tool interrupts a turn, the tool calls made before it are passed to the next run as text in the history. If you are using ReActV2, it records its own tool calls in a structured form, and the adapter doesn't yet rebuild them in that form.
 
 ## Tests
 
