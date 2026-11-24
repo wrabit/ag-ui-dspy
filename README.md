@@ -1,6 +1,6 @@
 # ag-ui-dspy
 
-Wraps a [DSPy](https://dspy.ai) module so it outputs [AG-UI](https://docs.ag-ui.com) events, so you can use CopilotKit or any other AG-UI front end with it.
+Wraps a [DSPy](https://dspy.ai) module so it outputs [AG-UI](https://docs.ag-ui.com) events. That lets you use CopilotKit or any other AG-UI front end with it.
 
 The naming in this integration follows the integrations in the AG-UI repo: `ag_ui_<framework>`, a `<Framework>Agent`, an `add_<framework>_fastapi_endpoint` helper.
 
